@@ -1,0 +1,21 @@
+# Secrets - NEVER COMMIT
+.claude/secrets.md
+.env
+*.pem
+*.key
+
+# Dependencies
+node_modules/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Docker
+*.tar

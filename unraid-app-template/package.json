@@ -1,0 +1,21 @@
+{
+  "name": "unraid-app-template",
+  "version": "1.0.0",
+  "description": "Template for deploying custom Docker apps to Unraid with CI/CD",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "keywords": [
+    "unraid",
+    "docker",
+    "cicd",
+    "deployment"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

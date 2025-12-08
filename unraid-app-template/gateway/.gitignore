@@ -1,0 +1,24 @@
+# Environment files with secrets
+.env
+
+# Authelia secrets directory
+authelia/secrets/
+
+# Authelia runtime data
+authelia/db.sqlite3
+authelia/notification.txt
+
+# Redis data
+redis-data/
+
+# Tailscale state
+tailscale-state/
+
+# Docker volumes
+volumes/
+
+# Editor files
+*.swp
+*.swo
+*~
+.DS_Store

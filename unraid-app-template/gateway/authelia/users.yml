@@ -1,0 +1,27 @@
+# Authelia Users Database
+#
+# File-based user storage. For production with multiple users,
+# consider LDAP or database backend.
+#
+# Generate password hashes with:
+#   docker run --rm authelia/authelia:latest \
+#     crypto hash generate argon2 --password 'your-password'
+
+users:
+  # Example user - replace with your own
+  admin:
+    displayname: "Admin User"
+    # Generate this hash with the command above
+    password: "$argon2id$v=19$m=65536,t=3,p=4$REPLACE_WITH_ACTUAL_HASH"
+    email: admin@example.com
+    groups:
+      - admins
+      - mcp-users
+
+  # Add more users as needed:
+  # alice:
+  #   displayname: "Alice"
+  #   password: "$argon2id$v=19$m=65536,t=3,p=4$..."
+  #   email: alice@example.com
+  #   groups:
+  #     - mcp-users

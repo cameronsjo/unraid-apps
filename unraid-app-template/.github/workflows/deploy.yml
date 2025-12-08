@@ -1,0 +1,218 @@
+# CI/CD Pipeline: Build, Push to GHCR, HITL Approval, Deploy to Unraid
+#
+# Trigger: Tag creation (v*)
+# Flow: Build -> Push to GHCR -> Discord Notify -> Wait for Approval -> Tailscale SSH -> Deploy
+#
+# Required Secrets:
+#   TAILSCALE_OAUTH_CLIENT_ID     - Tailscale OAuth client ID
+#   TAILSCALE_OAUTH_CLIENT_SECRET - Tailscale OAuth client secret
+#   UNRAID_TAILSCALE_HOSTNAME     - Unraid Tailscale hostname (e.g., "unraid" or "tower")
+#   DISCORD_WEBHOOK_URL           - Discord webhook URL
+#
+# Required Environment:
+#   production                    - GitHub Environment with required reviewers
+#
+# Tailscale Setup:
+#   1. Create OAuth client at https://login.tailscale.com/admin/settings/oauth
+#   2. Scopes: devices:write, auth_keys:write
+#   3. Enable Tailscale SSH on Unraid: Settings > Tailscale > Enable SSH
+#   4. Configure ACL to allow tag:ci to SSH to your server as root
+#
+# No SSH keys needed - Tailscale SSH handles authentication!
+
+name: Build and Deploy
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+  # Allow manual trigger for testing
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to deploy (e.g., v1.0.0)'
+        required: true
+        type: string
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  APP_NAME: ${{ github.event.repository.name }}
+
+jobs:
+  # ===========================================================================
+  # Build and Push
+  # ===========================================================================
+  build:
+    name: Build & Push
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      image: ${{ steps.meta.outputs.tags }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest,enable=${{ github.ref_type == 'tag' }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          # Target the production stage
+          target: production
+
+      - name: Generate build summary
+        run: |
+          echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** \`${{ steps.meta.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Tags:**" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.meta.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+  # ===========================================================================
+  # Notify (Discord)
+  # ===========================================================================
+  notify:
+    name: Notify
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Send Discord notification
+        uses: sarisia/actions-status-discord@v1
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          nodetail: true
+          title: "Deployment Pending Approval"
+          description: |
+            **Repository:** ${{ github.repository }}
+            **Version:** `${{ needs.build.outputs.version }}`
+            **Triggered by:** ${{ github.actor }}
+
+            [Review & Approve](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) | [View Image](${{ github.server_url }}/${{ github.repository }}/pkgs/container/${{ env.APP_NAME }})
+          color: 0x5865F2
+          username: GitHub Actions
+          avatar_url: https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png
+
+  # ===========================================================================
+  # Deploy (with HITL approval)
+  # ===========================================================================
+  deploy:
+    name: Deploy to Unraid
+    needs: [build, notify]
+    runs-on: ubuntu-latest
+    # HITL: Requires approval in GitHub Environments
+    environment: production
+
+    steps:
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v2
+        with:
+          oauth-client-id: ${{ secrets.TAILSCALE_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TAILSCALE_OAUTH_CLIENT_SECRET }}
+          tags: tag:ci
+
+      - name: Deploy to Unraid via Tailscale SSH
+        run: |
+          # Use Tailscale SSH - no keys needed, auth via Tailscale identity
+          tailscale ssh root@${{ secrets.UNRAID_TAILSCALE_HOSTNAME }} << DEPLOY_SCRIPT
+          set -e
+
+          APP_DIR="/mnt/user/appdata/${{ env.APP_NAME }}"
+          VERSION="${{ needs.build.outputs.version }}"
+
+          echo "Deploying ${{ env.APP_NAME }} version \${VERSION}..."
+
+          # Ensure directory exists
+          mkdir -p "\${APP_DIR}"
+          cd "\${APP_DIR}"
+
+          # Update version in .env
+          if [ -f .env ]; then
+            sed -i "s/^VERSION=.*/VERSION=\${VERSION}/" .env || echo "VERSION=\${VERSION}" >> .env
+          else
+            echo "VERSION=\${VERSION}" > .env
+          fi
+
+          # Pull new image and restart
+          docker compose pull
+          docker compose up -d --remove-orphans
+
+          # Cleanup old images
+          docker image prune -f
+
+          # Show status
+          docker compose ps
+
+          echo "Deployment complete!"
+          DEPLOY_SCRIPT
+
+      - name: Notify deployment success
+        if: success()
+        uses: sarisia/actions-status-discord@v1
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          nodetail: true
+          title: "Deployment Successful"
+          description: |
+            **${{ github.repository }}** version `${{ needs.build.outputs.version }}` deployed to Unraid
+          color: 0x57F287
+          username: GitHub Actions
+          avatar_url: https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png
+
+      - name: Notify deployment failure
+        if: failure()
+        uses: sarisia/actions-status-discord@v1
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          nodetail: true
+          title: "Deployment Failed"
+          description: |
+            **${{ github.repository }}** version `${{ needs.build.outputs.version }}` failed to deploy
+
+            [View Logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          color: 0xED4245
+          username: GitHub Actions
+          avatar_url: https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png
+
+      - name: Generate deployment summary
+        if: always()
+        run: |
+          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** \`${{ needs.build.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Target:** \`${{ secrets.UNRAID_HOST }}\`" >> $GITHUB_STEP_SUMMARY

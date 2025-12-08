@@ -1,0 +1,49 @@
+# Local Development docker-compose.yml
+# This file is for local development only
+# See docker-compose.prod.yml for Unraid production configuration
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: ${APP_NAME:-myapp}-dev
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
+    volumes:
+      # Mount source code for hot reload (development)
+      - .:/app:ro
+      - /app/node_modules
+      # Persistent data directory
+      - ./data:/app/data
+    environment:
+      - NODE_ENV=development
+      - TZ=${TZ:-America/Chicago}
+    env_file:
+      - .env
+    # Override for development (e.g., use nodemon)
+    # command: npm run dev
+
+  # Optional: Add development dependencies
+  # redis:
+  #   image: redis:alpine
+  #   container_name: ${APP_NAME:-myapp}-redis
+  #   ports:
+  #     - "6379:6379"
+
+  # db:
+  #   image: postgres:16-alpine
+  #   container_name: ${APP_NAME:-myapp}-db
+  #   environment:
+  #     POSTGRES_USER: ${DB_USER:-app}
+  #     POSTGRES_PASSWORD: ${DB_PASSWORD:-devpassword}
+  #     POSTGRES_DB: ${DB_NAME:-app}
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   ports:
+  #     - "5432:5432"
+
+# volumes:
+#   postgres_data:

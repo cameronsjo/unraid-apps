@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:dev.to)",
+      "WebFetch(domain:agentgateway.dev)",
+      "SlashCommand(/essentials:roadmap.add:*)",
+      "WebFetch(domain:api.github.com)",
+      "WebFetch(domain:tailscale.com)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

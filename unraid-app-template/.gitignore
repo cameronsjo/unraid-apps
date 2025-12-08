@@ -1,0 +1,56 @@
+# Dependencies
+node_modules/
+vendor/
+.pnp
+.pnp.js
+
+# Build outputs
+dist/
+build/
+out/
+*.egg-info/
+__pycache__/
+*.pyc
+
+# Environment
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Testing
+coverage/
+.nyc_output/
+.pytest_cache/
+
+# Data (local development)
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Secrets (never commit these!)
+*.pem
+*.key
+*.crt
+secrets/
+credentials.json
+service-account.json
