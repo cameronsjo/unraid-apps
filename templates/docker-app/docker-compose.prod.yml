@@ -1,0 +1,23 @@
+# Production compose file for Unraid
+#
+# Copy to: /mnt/user/appdata/<appname>/docker-compose.yml
+#
+# Usage:
+#   VERSION=1.0.0 docker compose pull
+#   docker compose up -d
+
+services:
+  app:
+    image: ghcr.io/YOUR_USERNAME/YOUR_APP:${VERSION:-latest}
+    container_name: myapp
+    ports:
+      - "3000:3000"
+    volumes:
+      - /mnt/user/appdata/myapp/data:/app/data
+    environment:
+      - NODE_ENV=production
+      - TZ=America/Chicago
+    restart: unless-stopped
+    labels:
+      # Disable Watchtower auto-updates (we use CI/CD)
+      - "com.centurylinklabs.watchtower.enable=false"

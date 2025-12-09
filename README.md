@@ -82,6 +82,8 @@ docker restart redis-mcp authelia mcp-everything obsidian-mcp agentgateway tails
 | [Unraid Setup](docs/deployment/unraid-setup.md) | Initial deployment guide |
 | [SigNoz Setup](docs/observability/signoz-setup.md) | Observability platform installation |
 | [Obsidian Architecture](docs/deployment/obsidian-mcp-architecture.md) | How the Obsidian MCP integration works |
+| [GHCR Setup](docs/deployment/ghcr-setup.md) | GitHub Container Registry authentication |
+| [Docker App Template](templates/docker-app/) | CI/CD pipeline for deploying custom apps |
 
 ## Project Structure
 
@@ -95,7 +97,8 @@ docker restart redis-mcp authelia mcp-everything obsidian-mcp agentgateway tails
 ├── dockerfiles/           # Custom Docker images
 ├── gateway/               # agentgateway configurations
 ├── scripts/               # Utility scripts
-└── unraid-app-template/   # Reusable CI/CD template
+└── templates/             # Reusable templates
+    └── docker-app/        # CI/CD pipeline for custom Docker apps
 ```
 
 ## Secrets Management

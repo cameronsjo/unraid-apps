@@ -1,0 +1,20 @@
+# Local development compose file
+#
+# Usage:
+#   docker compose up -d
+#   docker compose logs -f
+#   docker compose down
+
+services:
+  app:
+    build: .
+    container_name: myapp-dev
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./src:/app/src:ro
+      - ./data:/app/data
+    environment:
+      - NODE_ENV=development
+      - LOG_LEVEL=debug
+    restart: unless-stopped

@@ -13,6 +13,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Obsidian MCP server integration
 - JWT authentication in agentgateway with JWKS from Authelia
 - Comprehensive deployment documentation
+- CI/CD pipeline template for custom Docker apps (`templates/docker-app/`)
+- GHCR authentication on Unraid server
 
 ### Changed
 
