@@ -5,7 +5,9 @@
       "WebFetch(domain:agentgateway.dev)",
       "SlashCommand(/essentials:roadmap.add:*)",
       "WebFetch(domain:api.github.com)",
-      "WebFetch(domain:tailscale.com)"
+      "WebFetch(domain:tailscale.com)",
+      "WebFetch(domain:www.authelia.com)",
+      "WebFetch(domain:medium.com)"
     ],
     "deny": [],
     "ask": []
