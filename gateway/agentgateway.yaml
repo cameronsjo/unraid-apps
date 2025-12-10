@@ -1,93 +1,60 @@
 # agentgateway configuration
 #
-# MCP multiplexer with JWT validation and CEL-based authorization.
+# MCP multiplexer with JWT validation.
 # Replace YOUR_TAILNET with your actual Tailnet name.
-
-server:
-  address: ":8080"
-
-# JWT validation against Authelia
-auth:
-  # Authelia JWKS endpoint (via internal Docker network)
-  jwksUrl: http://authelia:9091/api/oidc/jwks
-
-  # Expected issuer (must match Authelia config)
-  issuer: https://mcp-gateway.YOUR_TAILNET.ts.net/auth
-
-  # Expected audience (the gateway itself)
-  audience: https://mcp-gateway.YOUR_TAILNET.ts.net
-
-# MCP server targets
-targets:
-  # Obsidian MCP
-  - name: obsidian
-    url: http://obsidian-mcp:3000/mcp
-
-  # Home Assistant MCP
-  - name: homeassistant
-    url: http://homeassistant-mcp:3000/mcp
-
-  # Add more backends as needed:
-  # - name: my-custom-app
-  #   url: http://my-custom-app:3000/mcp
-
-# CEL-based authorization rules
 #
-# Each rule is a CEL expression that must evaluate to true for the request to proceed.
-# Available variables:
-#   - mcp.tool.name: The tool being invoked (string)
-#   - jwt.scope: Token scopes (list, use .contains())
-#   - jwt.sub: Token subject/user ID (string)
-#   - jwt.aud: Token audience (string)
+# Deploy to: /mnt/user/appdata/agentgateway/config.yaml
+# JWKS file: /mnt/user/appdata/agentgateway/jwks.json
 #
-mcpAuthorization:
-  rules:
-    # =========================================================================
-    # Obsidian MCP - Note management
-    # =========================================================================
+# Fetch JWKS from Authelia:
+#   curl -s https://mcp-gateway.YOUR_TAILNET.ts.net/jwks.json > jwks.json
+#
+# NOTE: Using permissive mode because Claude.ai doesn't request an audience
+# in the OAuth flow, so the JWT has no audience claim. Permissive mode still
+# validates issuer and signature, just allows missing/invalid audience.
 
-    # Read operations
-    - 'mcp.tool.name == "obsidian_read_note" && jwt.scope.contains("obsidian:read")'
-    - 'mcp.tool.name == "obsidian_search" && jwt.scope.contains("obsidian:read")'
-    - 'mcp.tool.name == "obsidian_list_notes" && jwt.scope.contains("obsidian:read")'
-    - 'mcp.tool.name == "obsidian_global_search" && jwt.scope.contains("obsidian:read")'
+config:
+  adminAddr: "[::]:15000"
 
-    # Write operations
-    - 'mcp.tool.name == "obsidian_update_note" && jwt.scope.contains("obsidian:write")'
-    - 'mcp.tool.name == "obsidian_delete_note" && jwt.scope.contains("obsidian:write")'
-    - 'mcp.tool.name == "obsidian_manage_tags" && jwt.scope.contains("obsidian:write")'
-    - 'mcp.tool.name == "obsidian_manage_frontmatter" && jwt.scope.contains("obsidian:write")'
-
-    # =========================================================================
-    # Home Assistant MCP - Smart home control
-    # =========================================================================
-
-    # Read operations (state, entities)
-    - 'mcp.tool.name.startsWith("hass_get_") && jwt.scope.contains("home:read")'
-    - 'mcp.tool.name == "hass_list_entities" && jwt.scope.contains("home:read")'
-
-    # Execute operations (turn on/off, run automations)
-    - 'mcp.tool.name.startsWith("hass_call_") && jwt.scope.contains("home:execute")'
-    - 'mcp.tool.name == "hass_turn_on" && jwt.scope.contains("home:execute")'
-    - 'mcp.tool.name == "hass_turn_off" && jwt.scope.contains("home:execute")'
-
-    # =========================================================================
-    # Add rules for your custom MCP servers
-    # =========================================================================
-
-    # Example: Custom app with read/write scopes
-    # - 'mcp.tool.name.startsWith("myapp_read_") && jwt.scope.contains("myapp:read")'
-    # - 'mcp.tool.name.startsWith("myapp_write_") && jwt.scope.contains("myapp:write")'
-
-    # Example: Admin-only tools
-    # - 'mcp.tool.name == "admin_dangerous_action" && jwt.sub == "admin"'
-
-# Logging configuration
-logging:
-  level: info  # Change to "debug" for troubleshooting
-  format: json
-
-# Health check endpoint
-health:
-  enabled: true
-  path: /health
+binds:
+- port: 8080
+  listeners:
+  - routes:
+    - policies:
+        cors:
+          allowOrigins:
+            - "https://claude.ai"
+            - "https://claude.com"
+            - "https://api.anthropic.com"
+          allowHeaders:
+            - "Authorization"
+            - "Content-Type"
+            - "Accept"
+            - "X-Requested-With"
+          allowMethods:
+            - "GET"
+            - "POST"
+            - "OPTIONS"
+        jwtAuth:
+          # permissive: validates token if present, continues on failure
+          # strict: requires valid token (fails on audience mismatch)
+          mode: permissive
+          issuer: "https://mcp-gateway.YOUR_TAILNET.ts.net"
+          audiences:
+            - "https://mcp-gateway.YOUR_TAILNET.ts.net"
+            - "claude-mcp-client"
+          jwks:
+            file: /etc/agentgateway/jwks.json
+      backends:
+      - mcp:
+          targets:
+          - name: disney
+            mcp:
+              host: http://mouse-mcp:3000/mcp
+          # Add more MCP backends:
+          # - name: obsidian
+          #   mcp:
+          #     host: http://obsidian:3002/mcp
+          # - name: media-metadata
+          #   mcp:
+          #     host: http://media-mcp:3000/mcp
